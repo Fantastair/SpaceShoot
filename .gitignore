@@ -2,3 +2,4 @@ build/
 SDL_Shooter-Darwin
 SDL2/
 dist/
+.vscode/
