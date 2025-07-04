@@ -4,7 +4,7 @@ void Scene::init()
 {
 }
 
-void Scene::update(float dt)
+void Scene::update(float)
 {
 }
 
@@ -16,6 +16,6 @@ void Scene::clean()
 {
 }
 
-void Scene::handleEvents(SDL_Event& event)
+void Scene::handleEvents(SDL_Event&)
 {
 }

@@ -350,13 +350,13 @@ void SceneMain::keyboardControl(float dt)
 
     if (player.vmove_flag == 1)
     {
-        player.vspeed -= player.va * dt;
+        player.vspeed -= static_cast<int>(player.va * dt);
         if (player.vspeed < -player.vspeedmax) { player.vspeed = -player.vspeedmax; }
         player.position.y += dt * player.vspeed;
     }
     else if (player.vmove_flag == 2)
     {
-        player.vspeed += player.va * dt;
+        player.vspeed += static_cast<int>(player.va * dt);
         if (player.vspeed > player.vspeedmax) { player.vspeed = player.vspeedmax; }
         player.position.y += dt * player.vspeed;
     }
@@ -364,12 +364,12 @@ void SceneMain::keyboardControl(float dt)
     {
         if (player.vspeed > 0)
         {
-            player.vspeed -= player.va * dt;
+            player.vspeed -= static_cast<int>(player.va * dt);
             if (player.vspeed < 0) { player.vspeed = 0; }
         }
         else if (player.vspeed < 0)
         {
-            player.vspeed += player.va * dt;
+            player.vspeed += static_cast<int>(player.va * dt);
             if (player.vspeed > 0) { player.vspeed = 0; }
         }
         player.position.y += dt * player.vspeed;
@@ -377,13 +377,13 @@ void SceneMain::keyboardControl(float dt)
 
     if (player.hmove_flag == 1)
     {
-        player.hspeed -= player.ha * dt;
+        player.hspeed -= static_cast<int>(player.ha * dt);
         if (player.hspeed < -player.hspeedmax) { player.hspeed = -player.hspeedmax; }
         player.position.x += dt * player.hspeed;
     }
     else if (player.hmove_flag == 2)
     {
-        player.hspeed += player.ha * dt;
+        player.hspeed += static_cast<int>(player.ha * dt);
         if (player.hspeed > player.hspeedmax) { player.hspeed = player.hspeedmax; }
         player.position.x += dt * player.hspeed;
     }
@@ -391,21 +391,21 @@ void SceneMain::keyboardControl(float dt)
     {
         if (player.hspeed > 0)
         {
-            player.hspeed -= player.ha * dt;
+            player.hspeed -= static_cast<int>(player.ha * dt);
             if (player.hspeed < 0) { player.hspeed = 0; }
         }
         else if (player.hspeed < 0)
         {
-            player.hspeed += player.ha * dt;
+            player.hspeed += static_cast<int>(player.ha * dt);
             if (player.hspeed > 0) { player.hspeed = 0; }
         }
         player.position.x += dt * player.hspeed;
     }
 
     if (player.position.x < 0) { player.position.x = 0; }
-    else if (player.position.x > game.getWindowWidth() - player.width) { player.position.x = game.getWindowWidth() - player.width; }
+    else if (player.position.x > game.getWindowWidth() - player.width) { player.position.x = static_cast<float>(game.getWindowWidth() - player.width); }
     if (player.position.y < 0) { player.position.y = 0; }
-    else if (player.position.y > game.getWindowHeight() - player.height) { player.position.y = game.getWindowHeight() - player.height; }
+    else if (player.position.y > game.getWindowHeight() - player.height) { player.position.y = static_cast<float>(game.getWindowHeight() - player.height); }
 
     if (keyboardState[SDL_SCANCODE_J])
     {

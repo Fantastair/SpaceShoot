@@ -13,6 +13,6 @@ int main(int, char**)
     game.init();
 
     game.run();
-        
+
     return 0;
 }
