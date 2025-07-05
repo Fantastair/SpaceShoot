@@ -9,7 +9,6 @@
 int main(int, char**)
 {
     Game& game = Game::getInstance();
-
     game.init();
 
     game.run();

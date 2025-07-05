@@ -51,6 +51,11 @@ void SceneMain::init()
     player.width /= 4;
     player.height /= 4;
     player.position = {(game.getWindowWidth() - player.width) / 2.0f, game.getWindowHeight() - player.height - 0.0f};
+    player.hspeedmax = player.original_hspeedmax;
+    player.vspeedmax = player.original_vspeedmax;
+    player.ha = player.original_ha;
+    player.va = player.original_va;
+    player.coolDown = player.original_coolDown;
 
     playerFire.texture = IMG_LoadTexture(game.getRenderer(), "./assets/image/fire.png");
     if (playerFire.texture == nullptr)
@@ -110,6 +115,49 @@ void SceneMain::init()
         return;
     }
     SDL_QueryTexture(playerHP.texture, nullptr, nullptr, &playerHP.width, &playerHP.height);
+
+    itemHealthTemplate.texture = IMG_LoadTexture(game.getRenderer(), "./assets/image/bonus_health.png");
+    if (itemHealthTemplate.texture == nullptr)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load itemHealthTemplate texture: %s", IMG_GetError());
+        return;
+    }
+    SDL_QueryTexture(itemHealthTemplate.texture, nullptr, nullptr, &itemHealthTemplate.width, &itemHealthTemplate.height);
+    itemHealthTemplate.width /= 3;
+    itemHealthTemplate.height /= 3;
+    itemHealthTemplate.type = ItemType::Health;
+
+    itemShieldTemplate.texture = IMG_LoadTexture(game.getRenderer(), "./assets/image/bonus_shield.png");
+    if (itemShieldTemplate.texture == nullptr)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load itemShieldTemplate texture: %s", IMG_GetError());
+        return;
+    }
+    SDL_QueryTexture(itemShieldTemplate.texture, nullptr, nullptr, &itemShieldTemplate.width, &itemShieldTemplate.height);
+    itemShieldTemplate.width /= 3;
+    itemShieldTemplate.height /= 3;
+    itemShieldTemplate.type = ItemType::Shield;
+
+    itemFuelTemplate.texture = IMG_LoadTexture(game.getRenderer(), "./assets/image/bonus_fuel.png");
+    if (itemFuelTemplate.texture == nullptr)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load itemFuelTemplate texture: %s", IMG_GetError());
+        return;
+    }
+    SDL_QueryTexture(itemFuelTemplate.texture, nullptr, nullptr, &itemFuelTemplate.width, &itemFuelTemplate.height);
+    itemFuelTemplate.width /= 3;
+    itemFuelTemplate.height /= 3;
+    itemFuelTemplate.type = ItemType::Fuel;
+
+    playerShield.texture = IMG_LoadTexture(game.getRenderer(), "./assets/image/shield.png");
+    if (playerShield.texture == nullptr)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load playerShield texture: %s", IMG_GetError());
+        return;
+    }
+    SDL_QueryTexture(playerShield.texture, nullptr, nullptr, &playerShield.width, &playerShield.height);
+    playerShield.width /= 4;
+    playerShield.height /= 4;
 }
 
 /**
@@ -125,6 +173,8 @@ void SceneMain::update(float dt)
     updatePlayer(dt);
     updateEnemy(dt);
     updateExplosion(dt);
+    updateItem(dt);
+    updateShield(dt);
 }
 
 /**
@@ -136,8 +186,10 @@ void SceneMain::render()
     renderExplosion();
     renderProjectileEnemy();
     renderProjectilePlayer();
+    renderItem();
     renderEnemy();
     renderPlayer();
+    renderShield();
     renderPlayerInfo();
 }
 
@@ -235,6 +287,35 @@ void SceneMain::clean()
     {
         SDL_DestroyTexture(explosionTemplate.texture);
         explosionTemplate.texture = nullptr;
+    }
+    for (auto item : itemList)
+    {
+        if (item != nullptr)
+        {
+            item->texture = nullptr;
+            delete item;
+        }
+    }
+    itemList.clear();
+    if (itemHealthTemplate.texture != nullptr)
+    {
+        SDL_DestroyTexture(itemHealthTemplate.texture);
+        itemHealthTemplate.texture = nullptr;
+    }
+    if (itemShieldTemplate.texture != nullptr)
+    {
+        SDL_DestroyTexture(itemShieldTemplate.texture);
+        itemShieldTemplate.texture = nullptr;
+    }
+    if (itemFuelTemplate.texture != nullptr)
+    {
+        SDL_DestroyTexture(itemFuelTemplate.texture);
+        itemFuelTemplate.texture = nullptr;
+    }
+    if (playerShield.texture != nullptr)
+    {
+        SDL_DestroyTexture(playerShield.texture);
+        playerShield.texture = nullptr;
     }
 }
 
@@ -480,6 +561,16 @@ void SceneMain::updatePlayer(float)
 {
     // playerIsDead = false;
     // player.HP = player.maxHP;
+
+    if (player.HP > playerHP.showHP)
+    {
+        playerHP.showHP++;
+    }
+    else if (player.HP < playerHP.showHP)
+    {
+        playerHP.showHP--;
+    }
+
     if (playerIsDead) { return; }
 
     if (player.HP <= 0)
@@ -494,12 +585,27 @@ void SceneMain::updatePlayer(float)
         return;
     }
 
+    if (player.isSpeedingUp)
+    {
+        if (SDL_GetTicks() - player.startSpeedUpTime >= player.totalSpeedUpTime)
+        {
+            playerSpeedDown();
+        }
+    }
+
     for (auto enemy : enemyList)
     {
         if (getDistance2(player.position.x + player.width / 2.0f, player.position.y + player.height / 2.0f,
             enemy->position.x + enemy->width / 2.0f, enemy->position.y + enemy->height / 2.0f) <= player.hitRadius2)
         {
-            player.HP -= enemy->HP / 2;
+            if (player.shieldActive)
+            {
+                playerShield.value -= enemy->HP / 2;
+            }
+            else
+            {
+                player.HP -= enemy->HP / 2;
+            }
             enemy->HP -= player.hitDamage;
         }
     }
@@ -528,7 +634,7 @@ void SceneMain::renderPlayerInfo(void)
     SDL_Rect playerHPRect = {static_cast<int>(playerHP.position.x - playerHP.width / 4.0f), static_cast<int>(playerHP.position.y), playerHP.width, playerHP.height};
     SDL_RenderCopy(game.getRenderer(), playerHP.texture, NULL, &playerHPRect);
     SDL_SetRenderDrawColor(game.getRenderer(), playerHP.BarFgColor.r, playerHP.BarFgColor.g, playerHP.BarFgColor.b, playerHP.BarFgColor.a);
-    SDL_Rect hpBarRect; 
+    SDL_Rect hpBarRect;
     hpBarRect = {static_cast<int>(playerHP.position.x + playerHP.width - playerHP.BarBd), static_cast<int>(playerHP.position.y - playerHP.BarBd), playerHP.BarWidth + playerHP.BarBd * 2, playerHP.BarBd};
     SDL_RenderFillRect(game.getRenderer(), &hpBarRect);
     hpBarRect = {static_cast<int>(playerHP.position.x + playerHP.width - playerHP.BarBd), static_cast<int>(playerHP.position.y + playerHP.BarHeight), playerHP.BarWidth + playerHP.BarBd * 2, playerHP.BarBd};
@@ -538,9 +644,71 @@ void SceneMain::renderPlayerInfo(void)
     hpBarRect = {static_cast<int>(playerHP.position.x + playerHP.width + playerHP.BarWidth), static_cast<int>(playerHP.position.y), playerHP.BarBd, playerHP.BarHeight};
     SDL_RenderFillRect(game.getRenderer(), &hpBarRect);
     SDL_SetRenderDrawColor(game.getRenderer(), playerHP.BarBgColor.r, playerHP.BarBgColor.g, playerHP.BarBgColor.b, playerHP.BarBgColor.a);
-    hpBarRect = {static_cast<int>(playerHP.position.x + playerHP.width), static_cast<int>(playerHP.position.y), playerHP.BarWidth * player.HP / player.maxHP, playerHP.BarHeight};
+    hpBarRect = {static_cast<int>(playerHP.position.x + playerHP.width), static_cast<int>(playerHP.position.y), playerHP.BarWidth * playerHP.showHP / player.maxHP, playerHP.BarHeight};
     SDL_RenderFillRect(game.getRenderer(), &hpBarRect);
+    if (player.shieldActive)
+    {
+        hpBarRect = { static_cast<int>(playerHP.position.x + playerHP.width + playerHP.BarWidth), static_cast<int>(playerHP.position.y), static_cast<int>(playerHP.BarWidth * playerShield.showedValue / playerShield.maxValue), playerHP.BarHeight };
+        SDL_SetRenderDrawColor(game.getRenderer(), playerShield.barBg.r, playerShield.barBg.g, playerShield.barBg.b, playerShield.barBg.a);
+        SDL_RenderFillRect(game.getRenderer(), &hpBarRect);
+    }
+    if (player.isSpeedingUp)
+    {
+        int width = static_cast<int>(playerHP.BarWidth * (1 - (SDL_GetTicks() - player.startSpeedUpTime) / static_cast<float>(player.totalSpeedUpTime)));
+        if (width > playerHP.BarWidth) { width = playerHP.BarWidth; }
+        else if (width < 0) { width = 0; }
+        if (player.showedSpeedupBarWidth < width) { player.showedSpeedupBarWidth += 4; }
+        else if (player.showedSpeedupBarWidth > width) { player.showedSpeedupBarWidth--; }
+        hpBarRect = { static_cast<int>(playerHP.position.x + playerHP.width), static_cast<int>(playerHP.position.y + playerHP.BarHeight + playerHP.BarBd), player.showedSpeedupBarWidth, playerHP.BarHeight / 4 };
+        SDL_SetRenderDrawColor(game.getRenderer(), player.speedColor.r, player.speedColor.g, player.speedColor.b, player.speedColor.a);
+        SDL_RenderFillRect(game.getRenderer(), &hpBarRect);
+    }
     SDL_SetRenderDrawColor(game.getRenderer(), 0, 0, 0, 255);
+}
+
+/**
+ * @brief 玩家激活护盾
+ */
+void SceneMain::playerActiveShield(void)
+{
+    player.shieldActive = true;
+    playerShield.value = playerShield.maxValue;
+}
+
+/**
+ * @brief 玩家护盾值关闭
+ */
+void SceneMain::playerDeactivateShield(void)
+{
+    player.shieldActive = false;
+    playerShield.value = playerShield.showedValue = 0;
+}
+
+/**
+ * @brief 玩家加速
+ */
+void SceneMain::playerSpeedUp(void)
+{
+    player.isSpeedingUp = true;
+    player.startSpeedUpTime = SDL_GetTicks();
+    player.hspeedmax = player.speedUp_hspeedmax;
+    player.vspeedmax = player.speedUp_vspeedmax;
+    player.ha = player.speedUp_ha;
+    player.va = player.speedUp_va;
+    player.coolDown = player.speedUp_coolDown;
+}
+
+/**
+ * @brief 玩家减速
+ */
+void SceneMain::playerSpeedDown(void)
+{
+    player.isSpeedingUp = false;
+    player.hspeedmax = player.original_hspeedmax;
+    player.vspeedmax = player.original_vspeedmax;
+    player.ha = player.original_ha;
+    player.va = player.original_va;
+    player.coolDown = player.original_coolDown;
 }
 
 /**
@@ -695,6 +863,7 @@ void SceneMain::EnemyExplode(Enemy *enemy)
     explosion->position.y = enemy->position.y + (enemy->height - explosion->height) / 2.0f;
     explosion->startTime = SDL_GetTicks();
     explosionList.push_back(explosion);
+    dropItem(enemy);
     delete enemy;
 }
 
@@ -720,7 +889,14 @@ void SceneMain::updateProjectileEnemy(float dt)
             if (!playerIsDead && getDistance2(projectile->position.x + projectile->width / 2.0f, projectile->position.y + projectile->height / 2.0f,
                 player.position.x + player.width / 2.0f, player.position.y + player.height / 2.0f) <= projectile->damageRadius2)
             {
-                player.HP -= projectile->damage;
+                if (player.shieldActive)
+                {
+                    playerShield.value -= projectile->damage;
+                }
+                else
+                {
+                    player.HP -= projectile->damage;
+                }
                 delete projectile;
                 it = projectileEnemyList.erase(it);
             }
@@ -782,6 +958,76 @@ void SceneMain::renderExplosion(void)
 }
 
 /**
+ * @brief 更新掉落物品
+ * @param dt 时间增量
+ */
+void SceneMain::updateItem(float dt)
+{
+    for (auto it = itemList.begin(); it != itemList.end();)
+    {
+        auto item = *it;
+        if (item->state == 0)
+        {
+            if (SDL_GetTicks() - item->startExistTime > item->totalExistTime)
+            {
+                delete item;
+                it = itemList.erase(it);
+                continue;
+            }
+
+            item->position.x += item->direction.x * item->speed * dt;
+            item->position.y += item->direction.y * item->speed * dt;
+
+            if (getDistance2(item->position.x + item->width / 2.0f, item->position.y + item->height / 2.0f,
+                player.position.x + player.width / 2.0f, player.position.y + player.height / 2.0f) <= item->pickupRadius2)
+            {
+                item->state = 1;
+                item->startPickupTime = SDL_GetTicks();
+                item->direction.x = item->position.x + item->width / 2.0f;
+                item->direction.y = item->position.y + item->height / 2.0f;
+                it++;
+                continue;
+            }
+
+            if (item->position.x < 0 || item->position.x > game.getWindowWidth() - item->width)
+            {
+                item->direction.x *= -1;
+            }
+            if (item->position.y < 0 || item->position.y > game.getWindowHeight() - item->height)
+            {
+                item->direction.y *= -1;
+            }
+        }
+        else if (item->state == 1)
+        {
+            float process = (SDL_GetTicks() - item->startPickupTime) / static_cast<float>(item->totalPickupTime);
+            if (process >= 1.0f)
+            {
+                pickupItem(item);
+                delete item;
+                it = itemList.erase(it);
+                continue;
+            }
+            item->position.x = item->direction.x + process * (player.position.x + player.width / 2.0f - item->direction.x) - item->width / 2.0f;
+            item->position.y = item->direction.y + process * (player.position.y + player.height / 2.0f - item->direction.y) - item->height / 2.0f;
+        }
+        it++;
+    }
+}
+
+/**
+ * @brief 渲染掉落物品
+ */
+void SceneMain::renderItem(void)
+{
+    for (const auto& item : itemList)
+    {
+        SDL_Rect itemRect = {static_cast<int>(item->position.x), static_cast<int>(item->position.y), item->width, item->height};
+        SDL_RenderCopy(game.getRenderer(), item->texture, NULL, &itemRect);
+    }
+}
+
+/**
  * @brief 计算两点之间的平方距离
  * @param x1 第一个点的x坐标
  * @param y1 第一个点的y坐标
@@ -792,4 +1038,114 @@ void SceneMain::renderExplosion(void)
 float getDistance2(float x1, float y1, float x2, float y2)
 {
     return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+}
+
+/**
+ * @brief 掉落物品
+ * @param enemy 被销毁的敌机
+ */
+void SceneMain::dropItem(Enemy* enemy)
+{
+    if (dis(gen) < 0.4f)
+    {
+        Item* item;
+        auto n = dis(gen);
+        if (n < 0.5f)
+        {
+            item = new Item(itemHealthTemplate);
+        }
+        else if (n < 0.8f)
+        {
+            item = new Item(itemShieldTemplate);
+        }
+        else
+        {
+            item = new Item(itemFuelTemplate);
+        }
+        item->position.x = enemy->position.x + (enemy->width - item->width) / 2.0f;
+        item->position.y = enemy->position.y + (enemy->height - item->height) / 2.0f;
+        itemList.push_back(item);
+        n = dis(gen);
+        if (n < 0.25f)
+        {
+            item->direction.x = 1.0f;
+            item->direction.y = -1.0f;
+        }
+        else if (n < 0.5f)
+        {
+            item->direction.x = -1.0f;
+            item->direction.y = -1.0f;
+        }
+        else if (n < 0.75f)
+        {
+            item->direction.x = -1.0f;
+            item->direction.y = 1.0f;
+        }
+        else
+        {
+            item->direction.x = 1.0f;
+            item->direction.y = 1.0f;
+        }
+        item->startExistTime = SDL_GetTicks();
+    }
+}
+
+/**
+ * @brief 拾取物品
+ * @param item 被拾取的物品
+ */
+void SceneMain::pickupItem(Item *item)
+{
+    if (item->type == ItemType::Health)
+    {
+        player.HP += 20;
+        if (player.HP > player.maxHP) { player.HP = player.maxHP; }
+    }
+    else if (item->type == ItemType::Shield)
+    {
+        playerActiveShield();
+    }
+    else if (item->type == ItemType::Fuel)
+    {
+        playerSpeedUp();
+    }
+    
+}
+
+/**
+ * @brief 更新护盾状态
+ * @param dt 时间增量
+ */
+void SceneMain::updateShield(float dt)
+{
+    if (player.shieldActive)
+    {
+        playerShield.value -= playerShield.loseRate * dt;
+        if (playerShield.value <= 0)
+        {
+            player.shieldActive = false;
+            return;
+        }
+
+        if (playerShield.showedValue < playerShield.value)
+        {
+            playerShield.showedValue++;
+        }
+        else if (playerShield.showedValue > playerShield.value)
+        {
+            playerShield.showedValue--;
+        }
+    }
+}
+
+/**
+ * @brief 渲染护盾
+ */
+void SceneMain::renderShield(void)
+{
+    if (player.shieldActive)
+    {
+        SDL_Rect shieldRect = { static_cast<int>(player.position.x + (player.width - playerShield.width) / 2.0f), static_cast<int>(player.position.y - playerShield.height), playerShield.width, playerShield.height };
+        SDL_RenderCopy(game.getRenderer(), playerShield.texture, NULL, &shieldRect);
+    }
 }
