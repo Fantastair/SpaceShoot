@@ -719,7 +719,7 @@ void SceneMain::shootPlayer(void)
     auto projectile = new ProjectilePlayer(projectilePlayerTemplate);
     projectile->position.x = player.position.x + (player.width - projectile->width) / 2.0f;
     projectile->position.y = player.position.y;
-    projectile->damage *= 0.8f + dis(gen) * 0.4f;
+    projectile->damage = static_cast<int>(projectile->damage * 0.8f + dis(gen) * 0.4f);
     projectilePlayerList.push_back(projectile);
 }
 
@@ -780,9 +780,9 @@ void SceneMain::CreateEnemy(void)
     if (dis(gen) > 0.65f / game.getFPS()) { return; }
     auto enemy = new Enemy(enemyTemplate);
     enemy->position.x = dis(gen) * (game.getWindowWidth() - enemy->width);
-    enemy->position.y = -enemy->height;
-    enemy->speed = enemy->speed * (0.5f + dis(gen));
-    enemy->lastShootTime = SDL_GetTicks() + dis(gen) * enemy->coolDown;
+    enemy->position.y = static_cast<float>(-enemy->height);
+    enemy->speed = static_cast<int>(enemy->speed * (0.5f + dis(gen)));
+    enemy->lastShootTime = static_cast<Uint32>(SDL_GetTicks() + dis(gen) * enemy->coolDown);
     enemyList.push_back(enemy);
 }
 
@@ -931,7 +931,7 @@ void SceneMain::updateExplosion(float)
     for (auto it = explosionList.begin(); it != explosionList.end();)
     {
         auto explosion = *it;
-        explosion->currentFrame = (currentTime - explosion->startTime) * explosion->FPS / 1000.0f;
+        explosion->currentFrame = static_cast<int>((currentTime - explosion->startTime) * explosion->FPS / 1000.0f);
         if (explosion->currentFrame >= explosion->totalFrame)
         {
             delete explosion;
