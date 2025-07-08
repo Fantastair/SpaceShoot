@@ -17,6 +17,25 @@ void SceneMain::init()
     gen = std::mt19937(rd());
     dis = std::uniform_real_distribution<float>(0.0f, 1.0f);
 
+    bgm = Mix_LoadMUS("./assets/music/03_Racing_Through_Asteroids_Loop.ogg");
+    if (bgm == nullptr)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load background music: %s", Mix_GetError());
+        return;
+    }
+    if (Mix_PlayMusic(bgm, -1) == -1)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to play background music: %s", Mix_GetError());
+        return;
+    }
+
+    sounds["player_shoot"] = Mix_LoadWAV("./assets/sound/laser_shoot4.wav");
+    sounds["enemy_shoot"] = Mix_LoadWAV("./assets/sound/xs_laser.wav");
+    sounds["player_explode"] = Mix_LoadWAV("./assets/sound/explosion1.wav");
+    sounds["enemy_explode"] = Mix_LoadWAV("./assets/sound/explosion3.wav");
+    sounds["hit"] = Mix_LoadWAV("./assets/sound/eff11.wav");
+    sounds["get_item"] = Mix_LoadWAV("./assets/sound/eff5.wav");
+
     background.texture = IMG_LoadTexture(game.getRenderer(), "./assets/image/bg.png");
     if (background.texture == nullptr)
     {
@@ -317,6 +336,21 @@ void SceneMain::clean()
         SDL_DestroyTexture(playerShield.texture);
         playerShield.texture = nullptr;
     }
+
+    for (auto sound : sounds)
+    {
+        if (sound.second != nullptr)
+        {
+            Mix_FreeChunk(sound.second);
+        }
+    }
+    sounds.clear();
+
+    if (bgm != nullptr)
+    {
+        Mix_HaltMusic();
+        Mix_FreeMusic(bgm);
+    }
 }
 
 /**
@@ -582,6 +616,7 @@ void SceneMain::updatePlayer(float)
         explosionList.push_back(explosion);
         playerIsDead = true;
         player.HP = 0;
+        Mix_PlayChannel(-1, sounds["player_explode"], 0);
         return;
     }
 
@@ -607,6 +642,7 @@ void SceneMain::updatePlayer(float)
                 player.HP -= enemy->HP / 2;
             }
             enemy->HP -= player.hitDamage;
+            Mix_PlayChannel(-1, sounds["hit"], 0);
         }
     }
 }
@@ -721,6 +757,7 @@ void SceneMain::shootPlayer(void)
     projectile->position.y = player.position.y;
     projectile->damage = static_cast<int>(projectile->damage * 0.8f + dis(gen) * 0.4f);
     projectilePlayerList.push_back(projectile);
+    Mix_PlayChannel(-1, sounds["player_shoot"], 0);
 }
 
 /**
@@ -805,7 +842,7 @@ void SceneMain::updateEnemy(float dt)
         }
         else
         {
-            if (!playerIsDead && enemy->HP > enemy->maxHP * 0.2f && enemy->position.y + enemy->height / 2.0f < player.position.y + player.height / 2.0f && currentTime - enemy->lastShootTime >= enemy->coolDown)
+            if (!playerIsDead && enemy->HP > enemy->maxHP * 0.2f && enemy->position.y + enemy->height / 2.0f < player.position.y + player.height / 2.0f && currentTime > enemy->lastShootTime && currentTime - enemy->lastShootTime >= enemy->coolDown)
             {
                 auto projectile = new ProjectileEnemy(projectileEnemyTemplate);
                 projectile->position.x = enemy->position.x + (enemy->width - projectile->width) / 2.0f;
@@ -820,6 +857,7 @@ void SceneMain::updateEnemy(float dt)
                 }
                 enemy->lastShootTime = currentTime;
                 projectileEnemyList.push_back(projectile);
+                Mix_PlayChannel(-1, sounds["enemy_shoot"], 0);
             }
             if (enemy->HP <= 0)
             {
@@ -864,6 +902,7 @@ void SceneMain::EnemyExplode(Enemy *enemy)
     explosion->startTime = SDL_GetTicks();
     explosionList.push_back(explosion);
     dropItem(enemy);
+    Mix_PlayChannel(-1, sounds["enemy_explode"], 0);
     delete enemy;
 }
 
@@ -1109,7 +1148,7 @@ void SceneMain::pickupItem(Item *item)
     {
         playerSpeedUp();
     }
-    
+    Mix_PlayChannel(-1, sounds["get_item"], 0);
 }
 
 /**

@@ -4,8 +4,11 @@
 #include "Scene.h"
 #include "Object.h"
 
+#include <map>
 #include <list>
 #include <random>
+
+#include <SDL_mixer.h>
 
 class Game;
 
@@ -63,7 +66,10 @@ private:
 
     Game& game;
     Background background;
-    
+
+    Mix_Music* bgm = nullptr;
+    std::map<std::string, Mix_Chunk*> sounds;
+
     Player player;
     PlayerFire playerFire;
     PlayerHP playerHP;

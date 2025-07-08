@@ -2,6 +2,8 @@
 #include "SceneMain.h"
 #include <SDL.h>
 #include <SDL_image.h>
+#include <SDL_mixer.h>
+#include <SDL_ttf.h>
 
 Game::Game(void) {}
 
@@ -74,6 +76,25 @@ void Game::init(void)
         isRunning = false;
     }
 
+    if (Mix_Init(MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_WAVPACK) != (MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_WAVPACK))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Mix_Init Error: %s\n", Mix_GetError());
+        isRunning = false;
+    }
+
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Mix_OpenAudio Error: %s\n", Mix_GetError());
+        isRunning = false;
+    }
+
+    // 设置音效channel数量
+    Mix_AllocateChannels(32);
+
+    // 设置音乐音量
+    Mix_VolumeMusic(MIX_MAX_VOLUME / 2);
+    Mix_Volume(-1, MIX_MAX_VOLUME / 2);
+
     currentScene = new SceneMain();
     currentScene->init();
 
@@ -93,6 +114,9 @@ void Game::clean(void)
     }
 
     IMG_Quit();
+
+    Mix_CloseAudio();
+    Mix_Quit();
 
     if (renderer != nullptr)
     {
